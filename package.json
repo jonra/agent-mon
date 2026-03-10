@@ -1,0 +1,14 @@
+{
+  "name": "agent-mon",
+  "version": "1.0.0",
+  "description": "Claude Code agent monitoring dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.0",
+    "express": "^4.21.0"
+  }
+}

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent-Mon</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+  <header class="header">
+    <h1>Agent-Mon</h1>
+    <div class="header-stats">
+      <div class="stat stat-active">
+        <span>Active:</span>
+        <span class="stat-value" id="stat-active">-</span>
+      </div>
+      <div class="stat stat-processes">
+        <span>Processes:</span>
+        <span class="stat-value" id="stat-processes">-</span>
+      </div>
+      <div class="stat stat-total">
+        <span>Sessions:</span>
+        <span class="stat-value" id="stat-total">-</span>
+      </div>
+      <div class="stat">
+        <span>Projects:</span>
+        <span class="stat-value" id="stat-projects">-</span>
+      </div>
+    </div>
+    <div class="header-controls">
+      <button class="btn active" id="btn-tools" onclick="toggleTools()">Tools</button>
+      <button class="btn" id="btn-active-only" onclick="toggleActiveOnly()">Active Only</button>
+      <button class="btn" id="btn-metrics" onclick="toggleMetrics()">Metrics</button>
+      <button class="btn" onclick="refreshGraph()">Refresh</button>
+    </div>
+  </header>
+
+  <div class="main" id="main">
+    <div id="graph-container">
+      <div class="loading" id="loading">Loading graph...</div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background: #4a9eff"></div> Project</div>
+        <div class="legend-item"><div class="legend-dot" style="background: #50c878"></div> Active Session</div>
+        <div class="legend-item"><div class="legend-dot" style="background: #6b7280"></div> Session</div>
+        <div class="legend-item"><div class="legend-dot" style="background: #f59e0b"></div> Subagent</div>
+        <div class="legend-item"><div class="legend-dot" style="background: #a78bfa"></div> Tool</div>
+      </div>
+      <div class="tooltip" id="tooltip">
+        <div class="tooltip-label" id="tooltip-label"></div>
+        <div class="tooltip-meta" id="tooltip-meta"></div>
+      </div>
+    </div>
+
+    <div id="detail-panel">
+      <div class="detail-placeholder">Click a node to see details</div>
+    </div>
+
+    <div id="metrics-overlay" class="metrics-overlay hidden">
+      <div class="metrics-content">
+        <div class="metrics-header">
+          <h2>Metrics Dashboard</h2>
+          <button class="btn" onclick="toggleMetrics()">Close</button>
+        </div>
+        <div id="metrics-body" class="metrics-body">
+          <div class="metrics-loading">Loading metrics...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
