@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent-Mon — Registry</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="header">
+    <h1>Agent-Mon</h1>
+    <nav class="header-nav">
+      <a href="/" class="btn">Dashboard</a>
+      <a href="/registry" class="btn active">Registry</a>
+    </nav>
+    <div class="header-controls">
+      <input type="search" id="search" class="registry-search" placeholder="Search commands, plugins, agents...">
+      <select id="filter-type" class="registry-select" onchange="applyFilters()">
+        <option value="">All Types</option>
+        <option value="plugin">Plugins</option>
+        <option value="command">Commands</option>
+        <option value="agent">Agents</option>
+        <option value="mcp">MCP Servers</option>
+        <option value="claudemd">CLAUDE.md</option>
+      </select>
+      <select id="filter-source" class="registry-select" onchange="applyFilters()">
+        <option value="">All Sources</option>
+      </select>
+      <button class="btn" id="btn-view" onclick="toggleView()">Tree</button>
+      <button class="btn" id="btn-theme" onclick="toggleTheme()">Light</button>
+    </div>
+  </header>
+
+  <main class="registry-main" id="registry-main">
+    <div class="registry-loading" id="loading">Loading registry...</div>
+    <div class="registry-stats" id="stats"></div>
+    <div class="registry-grid" id="grid"></div>
+    <div class="registry-tree hidden" id="tree"></div>
+  </main>
+
+  <script src="/registry.js"></script>
+</body>
+</html>

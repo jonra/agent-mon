@@ -6,6 +6,7 @@ const { parseSessionOverview } = require('./lib/parser');
 const { detectActiveProcesses, getActiveSessions } = require('./lib/process-detector');
 const { buildGraph } = require('./lib/graph-builder');
 const { createWatcher } = require('./lib/watcher');
+const { scanRegistry } = require('./lib/registry-scanner');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -405,6 +406,24 @@ app.get('/api/debug', (req, res) => {
     cachedActiveSessionIds: [...cachedActiveSessionIds],
     agentMonSessionMtimes: sessionMtimes,
   });
+});
+
+// Registry page
+app.get('/registry', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'registry.html'));
+});
+
+// API: Registry
+let cachedRegistry = null;
+let registryScannedAt = 0;
+
+app.get('/api/registry', (req, res) => {
+  const now = Date.now();
+  if (!cachedRegistry || req.query.refresh === 'true' || (now - registryScannedAt) > 60000) {
+    cachedRegistry = scanRegistry();
+    registryScannedAt = now;
+  }
+  res.json(cachedRegistry);
 });
 
 // SSE endpoint
