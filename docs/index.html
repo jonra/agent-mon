@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent-Mon — Real-time Claude Code Monitor</title>
+  <meta name="description" content="Real-time visual monitoring dashboard for Claude Code agents. See sessions, subagents, tools, and metrics as an interactive graph.">
+  <meta property="og:title" content="Agent-Mon — Real-time Claude Code Monitor">
+  <meta property="og:description" content="See all your Claude Code sessions, subagents, tools, and metrics as a live interactive graph.">
+  <meta property="og:image" content="img.png">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0b0d11;
+      --bg-card: #141720;
+      --bg-surface: #1a1e2a;
+      --border: #252a3a;
+      --text: #e1e4ed;
+      --text-muted: #7a8194;
+      --blue: #4a9eff;
+      --green: #50c878;
+      --orange: #f59e0b;
+      --purple: #a78bfa;
+      --gradient-start: #4a9eff;
+      --gradient-end: #a78bfa;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Ambient glow background */
+    .bg-glow {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .bg-glow::before {
+      content: '';
+      position: absolute;
+      top: -20%;
+      left: 30%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(74, 158, 255, 0.06) 0%, transparent 70%);
+      animation: drift 20s ease-in-out infinite;
+    }
+    .bg-glow::after {
+      content: '';
+      position: absolute;
+      bottom: -10%;
+      right: 20%;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(167, 139, 250, 0.05) 0%, transparent 70%);
+      animation: drift 25s ease-in-out infinite reverse;
+    }
+    @keyframes drift {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(60px, -40px); }
+    }
+
+    /* Layout */
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Nav */
+    nav {
+      padding: 18px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-brand {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .nav-links {
+      display: flex;
+      gap: 24px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 14px;
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--text); }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 80px 0 48px;
+    }
+    .hero-badge {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      background: rgba(74, 158, 255, 0.1);
+      color: var(--blue);
+      border: 1px solid rgba(74, 158, 255, 0.2);
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-size: 52px;
+      font-weight: 800;
+      letter-spacing: -2px;
+      line-height: 1.1;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, var(--text) 0%, var(--text-muted) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+    .hero p {
+      font-size: 18px;
+      color: var(--text-muted);
+      max-width: 560px;
+      margin: 0 auto 36px;
+      line-height: 1.7;
+    }
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 28px;
+      background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(74, 158, 255, 0.25);
+    }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 28px;
+      background: var(--bg-card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-secondary:hover {
+      background: var(--bg-surface);
+      border-color: var(--text-muted);
+    }
+
+    /* Install block */
+    .install {
+      margin: 0 auto 48px;
+      max-width: 440px;
+    }
+    .install-code {
+      display: flex;
+      align-items: center;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 20px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 14px;
+      color: var(--text-muted);
+      gap: 12px;
+    }
+    .install-code code {
+      flex: 1;
+      color: var(--text);
+    }
+    .install-code span { color: var(--green); }
+    .copy-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      transition: color 0.15s;
+      font-size: 13px;
+    }
+    .copy-btn:hover { color: var(--text); }
+
+    /* Screenshots */
+    .screenshots {
+      padding: 32px 0 64px;
+    }
+    .screenshot-tabs {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+    .tab-btn {
+      padding: 8px 20px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-card);
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tab-btn:hover { border-color: var(--text-muted); color: var(--text); }
+    .tab-btn.active { border-color: var(--blue); color: var(--blue); background: rgba(74, 158, 255, 0.05); }
+    .screenshot-frame {
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+      background: var(--bg-card);
+    }
+    .screenshot-frame img {
+      width: 100%;
+      display: block;
+    }
+    .screenshot-frame img.hidden-tab { display: none; }
+
+    /* Features */
+    .features {
+      padding: 80px 0;
+    }
+    .features-header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+    .features-header h2 {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -1px;
+      margin-bottom: 12px;
+    }
+    .features-header p {
+      color: var(--text-muted);
+      font-size: 16px;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 700px) {
+      .feature-grid { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 36px; }
+    }
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .feature-card:hover {
+      border-color: var(--text-muted);
+      transform: translateY(-2px);
+    }
+    .feature-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      margin-bottom: 14px;
+    }
+    .feature-icon-blue { background: rgba(74, 158, 255, 0.12); }
+    .feature-icon-green { background: rgba(80, 200, 120, 0.12); }
+    .feature-icon-orange { background: rgba(245, 158, 11, 0.12); }
+    .feature-icon-purple { background: rgba(167, 139, 250, 0.12); }
+    .feature-card h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .feature-card p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Metrics section */
+    .metrics-showcase {
+      padding: 64px 0;
+      border-top: 1px solid var(--border);
+    }
+    .metrics-showcase h2 {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -1px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .metrics-showcase > p {
+      text-align: center;
+      color: var(--text-muted);
+      margin-bottom: 40px;
+      font-size: 16px;
+    }
+    .metric-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 40px;
+    }
+    .metric-pill {
+      padding: 10px 20px;
+      border-radius: 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .metric-pill strong {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+    .metric-pill.mp-blue strong { color: var(--blue); }
+    .metric-pill.mp-green strong { color: var(--green); }
+    .metric-pill.mp-orange strong { color: var(--orange); }
+    .metric-pill.mp-purple strong { color: var(--purple); }
+
+    /* How it works */
+    .how-it-works {
+      padding: 64px 0;
+      border-top: 1px solid var(--border);
+    }
+    .how-it-works h2 {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -1px;
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    @media (max-width: 700px) {
+      .steps { grid-template-columns: 1fr; }
+    }
+    .step {
+      text-align: center;
+      padding: 24px;
+    }
+    .step-number {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+      color: #fff;
+      font-weight: 700;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+    }
+    .step h3 {
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+    .step p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .step code {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 6px 14px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      color: var(--green);
+    }
+
+    /* Tech stack */
+    .tech {
+      padding: 48px 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+    }
+    .tech h2 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+    .tech-logos {
+      display: flex;
+      gap: 32px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .tech-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .tech-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* Footer */
+    footer {
+      padding: 32px 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    footer a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<div class="bg-glow"></div>
+
+<div class="container">
+  <nav>
+    <div class="nav-brand">Agent-Mon</div>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#metrics">Metrics</a></li>
+      <li><a href="#how-it-works">Setup</a></li>
+      <li><a href="https://github.com/jonra/agent-mon">GitHub</a></li>
+    </ul>
+  </nav>
+</div>
+
+<div class="container">
+  <section class="hero">
+    <div class="hero-badge">OPEN SOURCE</div>
+    <h1>See your <em>Claude Code</em><br>agents in action</h1>
+    <p>Real-time monitoring dashboard that visualizes every session, subagent, tool call, and token flowing through your Claude Code environment.</p>
+    <div class="hero-actions">
+      <a href="https://github.com/jonra/agent-mon" class="btn-primary">View on GitHub</a>
+      <a href="#how-it-works" class="btn-secondary">Quick Start</a>
+    </div>
+  </section>
+
+  <div class="install">
+    <div class="install-code">
+      <code><span>$</span> git clone &amp;&amp; npm install &amp;&amp; npm start</code>
+      <button class="copy-btn" onclick="navigator.clipboard.writeText('git clone https://github.com/jonra/agent-mon.git && cd agent-mon && npm install && npm start')">Copy</button>
+    </div>
+  </div>
+
+  <section class="screenshots">
+    <div class="screenshot-tabs">
+      <button class="tab-btn active" onclick="showTab('graph', this)">Graph View</button>
+      <button class="tab-btn" onclick="showTab('tree', this)">Tree View</button>
+    </div>
+    <div class="screenshot-frame">
+      <img id="tab-graph" src="img.png" alt="Agent-Mon graph view showing force-directed graph of Claude Code sessions, subagents, and tools">
+      <img id="tab-tree" src="img_1.png" alt="Agent-Mon tree view showing hierarchical project structure" class="hidden-tab">
+    </div>
+  </section>
+</div>
+
+<div class="container" id="features">
+  <section class="features">
+    <div class="features-header">
+      <h2>Everything you need to see</h2>
+      <p>Monitor every aspect of your Claude Code sessions in real time</p>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon feature-icon-green">&#9679;</div>
+        <h3>Live Force Graph</h3>
+        <p>Interactive D3 visualization showing projects, sessions, subagents, and tools as connected nodes. Active sessions pulse green.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon feature-icon-blue">&#9650;</div>
+        <h3>Tree Browser</h3>
+        <p>Collapsible hierarchy view. Browse projects, sessions, subagents, and tools in a familiar tree structure with active-first sorting.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon feature-icon-purple">&#9733;</div>
+        <h3>Metrics Dashboard</h3>
+        <p>Aggregate token usage, tool reliability rates, stop reason distribution, model usage, and file access patterns across all sessions.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon feature-icon-orange">&#9889;</div>
+        <h3>Real-time Updates</h3>
+        <p>File watcher and Server-Sent Events push changes instantly. See new sessions, tool calls, and subagent spawns as they happen.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon feature-icon-green">&#9635;</div>
+        <h3>Connected Animation</h3>
+        <p>Nodes connected to active sessions glow with color-coded pulses. Flowing particles travel along active edges showing data flow.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon feature-icon-blue">&#9681;</div>
+        <h3>Three Themes</h3>
+        <p>Dark, Light, and Claude Code themes. Preference persists across sessions. All animations and colors adapt to each theme.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="container" id="metrics">
+  <section class="metrics-showcase">
+    <h2>Deep session metrics</h2>
+    <p>Every session detail at a glance, extracted straight from JSONL logs</p>
+    <div class="metric-pills">
+      <div class="metric-pill mp-blue">
+        <strong>Token Usage</strong>
+        Input, output, cache write, cache read
+      </div>
+      <div class="metric-pill mp-green">
+        <strong>Cache Efficiency</strong>
+        Hit rate, read vs write ratio
+      </div>
+      <div class="metric-pill mp-orange">
+        <strong>Tool Reliability</strong>
+        Per-tool success and failure rates
+      </div>
+      <div class="metric-pill mp-purple">
+        <strong>Stop Reasons</strong>
+        end_turn, tool_use, max_tokens
+      </div>
+      <div class="metric-pill mp-blue">
+        <strong>File Access</strong>
+        Most read, most modified files
+      </div>
+      <div class="metric-pill mp-green">
+        <strong>Session Flow</strong>
+        Duration, turn count, avg latency
+      </div>
+      <div class="metric-pill mp-orange">
+        <strong>Model Usage</strong>
+        Which models across sessions
+      </div>
+      <div class="metric-pill mp-purple">
+        <strong>Heaviest Sessions</strong>
+        Ranked by total token consumption
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="container" id="how-it-works">
+  <section class="how-it-works">
+    <h2>Up and running in 30 seconds</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-number">1</div>
+        <h3>Clone</h3>
+        <p>Clone the repo and install dependencies</p>
+        <code>npm install</code>
+      </div>
+      <div class="step">
+        <div class="step-number">2</div>
+        <h3>Start</h3>
+        <p>Launch the server on localhost</p>
+        <code>npm start</code>
+      </div>
+      <div class="step">
+        <div class="step-number">3</div>
+        <h3>Monitor</h3>
+        <p>Open the dashboard and watch your agents</p>
+        <code>localhost:3000</code>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="container">
+  <section class="tech">
+    <h2>Built with</h2>
+    <div class="tech-logos">
+      <div class="tech-item"><div class="tech-dot" style="background: #50c878"></div> Node.js</div>
+      <div class="tech-item"><div class="tech-dot" style="background: #4a9eff"></div> Express</div>
+      <div class="tech-item"><div class="tech-dot" style="background: #f59e0b"></div> D3.js</div>
+      <div class="tech-item"><div class="tech-dot" style="background: #a78bfa"></div> HTMX</div>
+      <div class="tech-item"><div class="tech-dot" style="background: #6b7280"></div> Vanilla CSS</div>
+    </div>
+  </section>
+
+  <footer>
+    Agent-Mon runs entirely locally. No data leaves your machine.
+    <br>
+    <a href="https://github.com/jonra/agent-mon">GitHub</a> &middot; MIT License
+  </footer>
+</div>
+
+<script>
+function showTab(name, btn) {
+  document.querySelectorAll('.screenshot-frame img').forEach(img => img.classList.add('hidden-tab'));
+  document.getElementById('tab-' + name).classList.remove('hidden-tab');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
+
+</body>
+</html>

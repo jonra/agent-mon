@@ -46,7 +46,7 @@ Active sessions are detected by cross-referencing running `claude` processes (vi
 ## Quick start
 
 ```bash
-git clone https://github.com/youruser/agent-mon.git
+git clone https://github.com/jonra/agent-mon.git
 cd agent-mon
 npm install
 npm start
