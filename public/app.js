@@ -237,7 +237,7 @@ function renderGraph(data) {
   node.append('circle')
     .attr('r', d => d.size)
     .attr('fill', d => d.color)
-    .attr('stroke', d => selectedNodeId === d.id ? '#fff' : 'none')
+    .attr('stroke', d => selectedNodeId === d.id ? 'var(--text)' : 'none')
     .attr('stroke-width', 2)
     .attr('opacity', d => {
       if (d.active || d.connectedToActive) return 1;
@@ -274,7 +274,7 @@ function renderGraph(data) {
     selectedNodeId = d.id;
     // Update selection visual
     g.selectAll('circle')
-      .attr('stroke', n => n.id === d.id ? '#fff' : 'none');
+      .attr('stroke', n => n.id === d.id ? 'var(--text)' : 'none');
 
     if (d.type === 'session') {
       htmx.ajax('GET', `/api/session/${encodeURIComponent(d.sessionId)}`, '#detail-panel');
@@ -409,7 +409,11 @@ function initSSE() {
     let data = JSON.parse(e.data);
     graphData = data;
     if (activeOnly) data = filterActive(data);
-    renderGraph(data);
+    if (treeVisible) {
+      renderTree(data);
+    } else {
+      renderGraph(data);
+    }
     loadSummary();
   });
 
@@ -425,6 +429,170 @@ function initSSE() {
 
 // Metrics dashboard
 let metricsVisible = false;
+
+// Tree view
+let treeVisible = false;
+
+function toggleTreeView() {
+  treeVisible = !treeVisible;
+  const treeContainer = document.getElementById('tree-container');
+  const graphContainer = document.getElementById('graph-container');
+  const btn = document.getElementById('btn-tree');
+  treeContainer.classList.toggle('hidden', !treeVisible);
+  graphContainer.classList.toggle('hidden', treeVisible);
+  btn.classList.toggle('active', treeVisible);
+  if (treeVisible) renderTree(graphData);
+}
+
+function renderTree(data) {
+  const container = document.getElementById('tree-container');
+  while (container.firstChild) container.removeChild(container.firstChild);
+
+  // Build hierarchy: projects → sessions → (subagents + tools)
+  const nodeMap = new Map(data.nodes.map(n => [n.id, n]));
+  const children = new Map(); // parentId → [childNode]
+
+  for (const edge of data.edges) {
+    const srcId = typeof edge.source === 'object' ? edge.source.id : edge.source;
+    const tgtId = typeof edge.target === 'object' ? edge.target.id : edge.target;
+    if (!children.has(srcId)) children.set(srcId, []);
+    children.get(srcId).push(nodeMap.get(tgtId));
+  }
+
+  // Find root project nodes
+  const projects = data.nodes.filter(n => n.type === 'project');
+  if (projects.length === 0) {
+    const empty = el('div', 'tree-empty');
+    empty.textContent = 'No data';
+    container.appendChild(empty);
+    return;
+  }
+
+  for (const proj of projects) {
+    container.appendChild(buildTreeNode(proj, children, 0));
+  }
+}
+
+function buildTreeNode(node, childrenMap, depth) {
+  const kids = childrenMap.get(node.id) || [];
+  const hasKids = kids.length > 0;
+  const isExpanded = depth < 2 || node.active || node.connectedToActive;
+
+  const wrapper = el('div', 'tree-item');
+
+  const row = el('div', 'tree-row');
+  row.style.paddingLeft = (depth * 20 + 8) + 'px';
+
+  // Expand toggle
+  const toggle = el('span', 'tree-toggle');
+  if (hasKids) {
+    toggle.textContent = isExpanded ? '\u25BE' : '\u25B8';
+    toggle.addEventListener('click', () => {
+      const childContainer = wrapper.querySelector('.tree-children');
+      if (!childContainer) return;
+      const visible = !childContainer.classList.contains('hidden');
+      childContainer.classList.toggle('hidden', visible);
+      toggle.textContent = visible ? '\u25B8' : '\u25BE';
+    });
+  } else {
+    toggle.textContent = ' ';
+  }
+  row.appendChild(toggle);
+
+  // Color dot
+  const dot = el('span', 'tree-dot');
+  dot.style.background = node.color;
+  if (node.active) dot.classList.add('tree-dot-active');
+  row.appendChild(dot);
+
+  // Type badge
+  const badge = el('span', 'tree-badge tree-badge-' + node.type);
+  const badgeLabels = { project: 'PRJ', session: 'SES', subagent: 'AGT', tool: 'TL' };
+  badge.textContent = badgeLabels[node.type] || node.type;
+  row.appendChild(badge);
+
+  // Label
+  const label = el('span', 'tree-label');
+  label.textContent = node.label || node.id;
+  label.title = node.label || node.id;
+  row.appendChild(label);
+
+  // Meta info
+  const meta = el('span', 'tree-meta');
+  if (node.type === 'project') {
+    meta.textContent = (node.sessionCount || 0) + ' sessions';
+  } else if (node.type === 'session') {
+    const parts = [];
+    if (node.active) parts.push('ACTIVE');
+    if (node.model) parts.push(node.model.replace('claude-', ''));
+    if (node.messageCount) parts.push(node.messageCount + ' msgs');
+    meta.textContent = parts.join(' | ');
+    if (node.active) meta.classList.add('tree-meta-active');
+  } else if (node.type === 'subagent') {
+    meta.textContent = node.agentType || '';
+  }
+  row.appendChild(meta);
+
+  // Click to show detail
+  row.addEventListener('click', (e) => {
+    if (e.target === toggle) return;
+    selectedNodeId = node.id;
+    // Highlight
+    document.querySelectorAll('.tree-row-selected').forEach(r => r.classList.remove('tree-row-selected'));
+    row.classList.add('tree-row-selected');
+    if (node.type === 'session' && node.sessionId) {
+      htmx.ajax('GET', '/api/session/' + encodeURIComponent(node.sessionId), '#detail-panel');
+    } else {
+      showNodeDetail(node);
+    }
+  });
+
+  wrapper.appendChild(row);
+
+  // Children
+  if (hasKids) {
+    // Sort: active sessions first, then by type
+    const sortOrder = { session: 0, subagent: 1, tool: 2 };
+    kids.sort((a, b) => {
+      if (a.active && !b.active) return -1;
+      if (!a.active && b.active) return 1;
+      return (sortOrder[a.type] || 3) - (sortOrder[b.type] || 3);
+    });
+
+    const childContainer = el('div', 'tree-children');
+    if (!isExpanded) childContainer.classList.add('hidden');
+    for (const child of kids) {
+      childContainer.appendChild(buildTreeNode(child, childrenMap, depth + 1));
+    }
+    wrapper.appendChild(childContainer);
+  }
+
+  return wrapper;
+}
+
+// Theme toggle
+const THEMES = ['dark', 'light', 'claude'];
+let currentTheme = localStorage.getItem('agent-mon-theme') || 'dark';
+
+function applyTheme(theme) {
+  document.documentElement.classList.remove('light', 'claude');
+  if (theme !== 'dark') document.documentElement.classList.add(theme);
+  const btn = document.getElementById('btn-theme');
+  const nextIdx = (THEMES.indexOf(theme) + 1) % THEMES.length;
+  const labels = { dark: 'Dark', light: 'Light', claude: 'Claude' };
+  btn.textContent = labels[THEMES[nextIdx]];
+  btn.classList.toggle('active', theme !== 'dark');
+}
+
+function toggleTheme() {
+  const nextIdx = (THEMES.indexOf(currentTheme) + 1) % THEMES.length;
+  currentTheme = THEMES[nextIdx];
+  localStorage.setItem('agent-mon-theme', currentTheme);
+  applyTheme(currentTheme);
+}
+
+// Apply saved theme on load
+applyTheme(currentTheme);
 
 function toggleMetrics() {
   metricsVisible = !metricsVisible;
