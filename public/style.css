@@ -865,3 +865,101 @@ body {
   line-height: 1.5;
   margin-top: 8px;
 }
+
+/* ===== Workspace Page ===== */
+.workspace-container {
+  position: relative;
+  height: calc(100vh - 49px);
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.workspace-container canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.workspace-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.workspace-status .stat-value {
+  font-weight: 600;
+  color: var(--green);
+}
+
+.workspace-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 2;
+}
+.workspace-empty-icon {
+  font-size: 48px;
+  opacity: 0.3;
+  margin-bottom: 12px;
+}
+.workspace-empty p {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.workspace-tooltip {
+  display: none;
+  position: absolute;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 20;
+  max-width: 280px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.tt-label { font-weight: 600; font-size: 13px; margin-bottom: 2px; color: var(--text); }
+.tt-project { color: var(--text-muted); font-size: 11px; margin-bottom: 4px; }
+.tt-state { font-weight: 500; margin-bottom: 2px; }
+.tt-detail { color: var(--text-muted); font-size: 11px; font-family: 'SF Mono', 'Fira Code', monospace; }
+.tt-model { color: var(--text-muted); font-size: 10px; margin-top: 4px; }
+.tt-subs { color: var(--orange); font-size: 11px; margin-top: 2px; }
+.tt-history { color: var(--text-muted); font-size: 10px; margin-top: 4px; font-family: 'SF Mono', 'Fira Code', monospace; }
+
+.workspace-legend {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  gap: 14px;
+  padding: 8px 14px;
+  background: color-mix(in srgb, var(--bg-card) 92%, transparent);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 11px;
+  z-index: 5;
+}
+.legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.legend-sep {
+  width: 1px;
+  background: var(--border);
+  margin: 0 4px;
+}
+.legend-icon {
+  margin-right: 4px;
+  font-size: 12px;
+  vertical-align: middle;
+}

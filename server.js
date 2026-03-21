@@ -7,6 +7,7 @@ const { detectActiveProcesses, getActiveSessions } = require('./lib/process-dete
 const { buildGraph } = require('./lib/graph-builder');
 const { createWatcher } = require('./lib/watcher');
 const { scanRegistry } = require('./lib/registry-scanner');
+const { getWorkspaceState } = require('./lib/activity-parser');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -40,6 +41,12 @@ setInterval(() => {
     const graph = buildGraph(cachedProjects, cachedActiveSessionIds, { maxSessionsPerProject: 15 });
     broadcast('graph-update', graph);
   }
+
+  // Always broadcast workspace update for active session activity changes
+  if (cachedActiveSessionIds.size > 0) {
+    const workspace = getWorkspaceState(cachedProjects, cachedActiveSessionIds);
+    broadcast('workspace-update', workspace);
+  }
 }, 5000);
 
 // Full re-scan every 30s to pick up new sessions
@@ -47,12 +54,22 @@ setInterval(() => {
   refreshData();
 }, 30000);
 
-// File watcher
+// File watcher — throttle workspace broadcasts to avoid flickering
+let pendingWorkspaceBroadcast = false;
 createWatcher((event) => {
   // Re-scan on any change
   refreshData();
   const graph = buildGraph(cachedProjects, cachedActiveSessionIds, { maxSessionsPerProject: 15 });
   broadcast('graph-update', graph);
+  // Throttle workspace updates to max once per 2 seconds
+  if (!pendingWorkspaceBroadcast) {
+    pendingWorkspaceBroadcast = true;
+    setTimeout(() => {
+      pendingWorkspaceBroadcast = false;
+      const workspace = getWorkspaceState(cachedProjects, cachedActiveSessionIds);
+      broadcast('workspace-update', workspace);
+    }, 2000);
+  }
 });
 
 function broadcast(eventType, data) {
@@ -406,6 +423,17 @@ app.get('/api/debug', (req, res) => {
     cachedActiveSessionIds: [...cachedActiveSessionIds],
     agentMonSessionMtimes: sessionMtimes,
   });
+});
+
+// Workspace page
+app.get('/workspace', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'workspace.html'));
+});
+
+// API: Workspace state
+app.get('/api/workspace', (req, res) => {
+  const workspace = getWorkspaceState(cachedProjects, cachedActiveSessionIds);
+  res.json(workspace);
 });
 
 // Registry page

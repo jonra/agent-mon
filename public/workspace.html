@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent-Mon — Workspace</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="header">
+    <h1>Agent-Mon</h1>
+    <nav class="header-nav">
+      <a href="/" class="btn">Dashboard</a>
+      <a href="/registry" class="btn">Registry</a>
+      <a href="/workspace" class="btn active">Workspace</a>
+    </nav>
+    <div class="header-controls">
+      <div class="workspace-status">
+        <span>Workers:</span>
+        <span class="stat-value" id="worker-count">0</span>
+      </div>
+      <button class="btn" id="btn-theme" onclick="toggleTheme()">Light</button>
+    </div>
+  </header>
+
+  <div class="workspace-container">
+    <canvas id="workspace-canvas"></canvas>
+    <div class="workspace-empty" id="workspace-empty">
+      <div class="workspace-empty-icon">&#9881;</div>
+      <p>No active agents</p>
+      <p class="muted">Start a Claude Code session to see Lego workers appear here</p>
+    </div>
+    <div class="workspace-tooltip" id="tooltip"></div>
+    <div class="workspace-legend">
+      <div class="legend-item"><span class="legend-swatch" style="background: #50c878"></span> Coding</div>
+      <div class="legend-item"><span class="legend-swatch" style="background: #4a9eff"></span> Reading</div>
+      <div class="legend-item"><span class="legend-swatch" style="background: #f59e0b"></span> Thinking</div>
+      <div class="legend-item"><span class="legend-swatch" style="background: #a78bfa"></span> Collaborating</div>
+      <div class="legend-item"><span class="legend-swatch" style="background: #6b7280"></span> Idle</div>
+      <div class="legend-sep"></div>
+      <div class="legend-item"><span class="legend-icon">&#9879;</span> Token Meter</div>
+      <div class="legend-item"><span class="legend-icon">&#128452;</span> File Cabinet</div>
+    </div>
+  </div>
+
+  <script src="/workspace.js"></script>
+  <script>
+    function toggleTheme() {
+      const root = document.documentElement;
+      const btn = document.getElementById('btn-theme');
+      if (root.classList.contains('light')) {
+        root.classList.remove('light');
+        root.classList.add('claude');
+        btn.textContent = 'Dark';
+      } else if (root.classList.contains('claude')) {
+        root.classList.remove('claude');
+        btn.textContent = 'Light';
+      } else {
+        root.classList.add('light');
+        btn.textContent = 'Claude';
+      }
+    }
+  </script>
+</body>
+</html>
